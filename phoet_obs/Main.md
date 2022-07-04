@@ -1,0 +1,24 @@
+# Features
+- Editor kola
+- Skeniranje kola
+	- Zica
+	- Otpornik
+	- Idealni naponski
+	- Idealni strujni
+	- Realni naponski generator
+	- Prekidac
+	- Preklopnik
+	- Imena komponenti
+	- Cvorovi
+	- Napnoni izmedju grana
+	- Struja u grani
+	- Uzemljenje
+	- Ampermetar
+	- Voltmetar
+	- Potenciometar
+- Resevanje kola
+	- Provera simetrije
+	- Delta kola
+	- Linearnost
+	- Prilagodjenje po snazi za otpornik
+	- Racunanje tevenena izmedju
