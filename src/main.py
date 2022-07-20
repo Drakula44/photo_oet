@@ -20,6 +20,7 @@ def get_radius(filename):
 
     # find circles in image
     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, 20, param1=50, param2=100, minRadius=0, maxRadius=0)
+    print(circles)
     radius = 0
     # draw circles
     if circles is not None:
@@ -28,6 +29,8 @@ def get_radius(filename):
             radius = i[2]
             cv2.circle(img, (i[0], i[1]), i[2], (0, 255, 0), 2)
             cv2.circle(img, (i[0], i[1]), 2, (0, 0, 255), 3)
+    plt.imshow(img)
+    plt.show()
     return radius
 
 def get_coefs(line_ends):
