@@ -20,6 +20,7 @@ def get_radius(filename):
 
     # find circles in image
     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, 20, param1=50, param2=100, minRadius=0, maxRadius=0)
+    print(circles)
     radius = 0
     # draw circles
     if circles is not None:
@@ -28,6 +29,8 @@ def get_radius(filename):
             radius = i[2]
             cv2.circle(img, (i[0], i[1]), i[2], (0, 255, 0), 2)
             cv2.circle(img, (i[0], i[1]), 2, (0, 0, 255), 3)
+    plt.imshow(img)
+    plt.show()
     return radius
 
 def get_coefs(line_ends):
@@ -44,8 +47,6 @@ def is_between(x, left, right):
     right += 1
     return x >= left and x <= right
 
-def close_enough(point1, point2):
-    return abs(point1[0]-point2[0]) <= 1 and abs(point1[1]-point2[1]) <= 1
 
 def get_intersection(line1, line2):
     A1, B1, C1 = get_coefs(line1)
