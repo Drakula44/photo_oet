@@ -47,8 +47,6 @@ def is_between(x, left, right):
     right += 1
     return x >= left and x <= right
 
-def close_enough(point1, point2):
-    return abs(point1[0]-point2[0]) <= 1 and abs(point1[1]-point2[1]) <= 1
 
 def get_intersection(line1, line2):
     A1, B1, C1 = get_coefs(line1)
