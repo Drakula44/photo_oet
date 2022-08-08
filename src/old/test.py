@@ -11,7 +11,7 @@ from skimage.data import astronaut
 from skimage.filters import window
 from skimage import filters
 
-from flood_fill_tools import flood_recursive, flood_recursive_find_max, find_closest
+from old.flood_fill_tools import flood_recursive, flood_recursive_find_max, find_closest
 sys.setrecursionlimit(10000)
 
 

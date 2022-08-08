@@ -1,165 +1,170 @@
+from re import L
 import numpy as np
-from skimage.filters import sobel_h, sobel_v
-from skimage.segmentation import flood, flood_fill
 import matplotlib.pyplot as plt
-from flood_fill_tools import find_remeaning_components,get_centers
-from skimage.morphology import skeletonize
-
 import cv2
+import random  
 
-def detect_circles(img):
-    edge_sobel_h = sobel_h(img)
-    edge_sobel_v = sobel_v(img)
-    edge_sobel = np.abs(edge_sobel_h*edge_sobel_v)
-    edge_sobel = edge_sobel*255
-    edge_sobel = edge_sobel.astype(np.uint8)
-    return edge_sobel
+from components import *
+from image_processing_tools import display_changes
 
-def fill_circles(img):
-    kernel = np.ones((3, 3), np.uint8)
-    dilated = cv2.dilate(img, kernel, iterations=1)
-    # average = cv2.blur(dilated, (7, 7))
-    # _, thresh = cv2.threshold(average, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    # eroded = cv2.erode(thresh, kernel, iterations=1)
-    return dilated
+# radius of generator should not be constant but for now
+RADIUS = 25
 
-def get_gens_cords(img):
+# refactored
+def get_color(node):
+    if isinstance(node, Generator):
+        if node.type.symbol == "I":
+            return (255,255,0)
+        else:
+            return (0,255,255)
+    elif isinstance(node, Resistor):
+        return (0,0,255)
+    elif isinstance(node, Junction):
+        return (255,0,0)
+    else:
+        return (0,0,0)
+
+# refactored?
+def visualize_graph(lines: List[npt.ArrayLike], nodes: List[Node], img: npt.ArrayLike):
     img = img.copy()
-    # find circles in image with HoughCircles
-    maxRadius = int(max(img.shape[0], img.shape[1])/4)
-    minRadius = maxRadius//8
-    circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 20, param1=50, param2=30, minRadius=minRadius, maxRadius=maxRadius)
-    if circles is None:
-        print("No generators found")
-        return img
-    # convert circles to numpy array
-    circles = np.uint16(np.around(circles))
-    return circles[0,:]
-
-
-def turn_off_gens(img, circles):
-    _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    for i in circles:
-        cv2.circle(img, (i[0], i[1]), i[2], (255, 255, 255), -1)
-        img = flood_fill(img, (i[1], i[0]), 0)
+    for line in lines:
+        line = (list(line[0].astype(int)),list(line[1].astype(int)))
+        cv2.line(img, line[0],line[1], (random.randint(0,255),random.randint(0,255),random.randint(0,255)),5)
+    for node in nodes:
+        cv2.circle(img, node.cords, 10, get_color(node), -1)
+        if not hasattr(node, "name"):
+            continue
+        cv2.putText(img, node.name.symbol, node.cords, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 2)
     return img
 
-def get_resistors_cords(img, circuit_graph_img):
-    kernel = np.ones((3, 3), np.uint8)
-    dilated = cv2.dilate(circuit_graph_img, kernel, iterations=3)
-    circuit_graph_img = dilated
-    img = img.copy()
-    img = img * circuit_graph_img / 255
+# refactored
+def close_enoug_to_line(line: npt.ArrayLike, node: Node):
+    node_cords = node.cords
+    d1 = np.linalg.norm(line[0]-node_cords)
+    d2 = np.linalg.norm(line[1]-node_cords)
+    r = np.linalg.norm(line[1]-line[0])
+    d= np.linalg.norm(np.cross(line[0]-line[1], node_cords-line[1]))/np.linalg.norm(line[0]-line[1])
+    return d < 3 and d1/r < 0.8 and d2/r < 0.8
 
-    return find_remeaning_components(img)
-
-
-def visualize_components(rgb_img, gen_cords, resistor_cords):
-    for e in resistor_cords:
-        cv2.circle(rgb_img, e[0], 1, (255, 0, 255), -1)
-        cv2.rectangle(rgb_img, e[1], e[2], (255, 0, 255), 2)
-
-    for e in gen_cords:
-        cv2.circle(rgb_img, (e[0], e[1]), int(e[2]*1.1), (0, 0, 255), 2)
-        cv2.circle(rgb_img, (e[0], e[1]), 1, (0, 0, 255), -1)
-
-    return rgb_img
-
-def find_connections(img, start_point, end_point):
-    # scale img to 0-1
-    img = img.copy()
-    img = img / 255
-
-    img = skeletonize(img)
-    img = img.astype(np.uint8)*255
-    starty, startx  = start_point
-    endy, endx = end_point
-    offset = 2
-    startx -= offset
-    starty -= offset
-    endx += offset
-    endy += offset
-    ends = []
-    for i in range(startx, endx):
-        if img[i, starty] == 255:
-            ends.append((i, starty))
-        if img[i, endy] == 255:
-            ends.append((i, endy))
-    for j in range(starty, endy):
-        if img[startx, j] == 255:
-            ends.append((startx, j))
-        if img[endx, j] == 255:
-            ends.append((endx, j))
-    if len(ends) == 0:
-        print("aaaaa")
-        return
-    if len(ends) != 2:
-        print("Error: more than 2 ends found")
-        return
-    cv2.line(img, (ends[0][1], ends[0][0]), (ends[1][1], ends[1][0]), (255,255,255), 1)
-    return img
-
-def turn_off_components(img, resistor_cords, gen_cords):
-    for e in resistor_cords:
-        cv2.rectangle(img, e[1], e[2], (0,0,0), -1)
-        img = find_connections(img, e[1], e[2])
-    for e in gen_cords:
-        r = int(e[2]*1.22)
-        cv2.circle(img, (e[0], e[1]), r, (0,0,0), -1)
-        img = find_connections(img, (e[0]-r, e[1]-r), (e[0]+r, e[1]+r))
-    return img
-
-def find_lines(img):
-    img = img.copy()
-    # find lines in image with HoughLines
-    # lines = cv2.HoughLines(img, 1, np.pi / 180, 100, None, 0, 0)
-    lines = cv2.HoughLinesP(img, 1, np.pi / 180, 50, None, 50, 10)
-    if lines is None:
-        print("No lines found")
-        return img
-    # convert lines to numpy array
+def merge_point(lines, junctions):
+    for l1 in range(len(lines)):
+        for l2 in range(len(lines)):
+            if close_enough(lines[l1][0], lines[l2][0]):
+                if Node(lines[l1][0], None, None) in junctions:
+                    lines[l2][0] = lines[l1][0]
+                else:
+                    lines[l1][0] = lines[l2][0]
+            if close_enough(lines[l1][0], lines[l2][1]):
+                if Node(lines[l1][0], None, None) in junctions:
+                    lines[l2][1] = lines[l1][0]
+                else:
+                    lines[l1][0] = lines[l2][1]
+            if close_enough(lines[l1][1], lines[l2][0]):
+                if Node(lines[l1][1], None, None) in junctions:
+                    lines[l2][0] = lines[l1][1]
+                else:
+                    lines[l1][1] = lines[l2][0]
+            if close_enough(lines[l1][1], lines[l2][1]):
+                if Node(lines[l1][1], None, None) in junctions:
+                    lines[l2][1] = lines[l1][1]
+                else:
+                    lines[l1][1] = lines[l2][1]
     return lines
 
-def visualize_lines(img, lines):
-    # for i in range(0, len(lines)):
-    #     rho = lines[i][0][0]
-    #     theta = lines[i][0][1]
-    #     a = np.cos(theta)
-    #     b = np.sin(theta)
-    #     x0 = a * rho
-    #     y0 = b * rho
-    #     pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
-    #     pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
-    #     cv2.line(img, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
-    for i in range(0, len(lines)):
-        l = lines[i][0]
-        cv2.line(img, (l[0], l[1]), (l[2], l[3]), (0,255,0), 1)
-    return img
 
+def split_lines(lines :List[npt.ArrayLike], nodes: List[Node]):
+    lines_split = []
+    for line in lines:
+        one_split = False
+        for node in nodes:
+            if close_enoug_to_line(line, node):
+                one_split = True
+                lines_split.append([line[0],node.cords])
+                lines_split.append([node.cords,line[1]])
+        if not one_split:
+            lines_split.append(line)
+    return lines_split
 
-def extract_junctions(img):
-    kernel = np.ones((3, 3), np.uint8)
-    img = cv2.erode(img, kernel, iterations=2)
-    img = cv2.dilate(img, kernel, iterations=2)
-    centers = get_centers(img)
-    return centers
+def close_enough(p1, p2):
+    return np.linalg.norm(p1-p2) < 5
 
-def visualize_junctions(img, centers):
-    for e in centers:
-        cv2.circle(img, e, 1, (255, 0, 0), -1)
-    return img
+# FUTURE
+# if component have more then 2 connection points this wont work
+def add_components(lines, nodes: List[Node], components: List[Node]):
+    splited_lines = []
+    for line in lines:
+        one_split = False
+        for component in components:
+            if close_enoug_to_line(line, component):
+                one_split = True
+                splited_lines.append([line[0],component.cords])
+                splited_lines.append([component.cords,line[1]])
+                nodes.append(component)
+        if not one_split:
+            splited_lines.append(line)
+    return splited_lines, nodes
 
+def find_closest_detail(node, details):
+    closest_detail = None
+    closest_dist = None
+    for i, detail in enumerate(details):
+        detail = detail.cords
+        dist = np.linalg.norm(node-detail)
+        if closest_dist is None or dist < closest_dist:
+            closest_dist = dist
+            closest_detail = i
+    return closest_detail
 
-def cluster_symbols(img):
-    # dilate img to get bigger symbols
-    kernel = np.ones((5, 5), np.uint8)
-    img = cv2.dilate(img, kernel, iterations=2)
-    img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    return img
+def find_closest_node(detail, nodes):
+    closest_node = None
+    closest_dist = None
+    for i, node in enumerate(nodes):
+        node = node.cords
+        dist = np.linalg.norm(detail-node)
+        if closest_dist is None or dist < closest_dist:
+            closest_dist = dist
+            closest_node = i
+    return closest_node
 
-def assign_details(details, gen_cords, resistor_cords, nodes):
-    for r in resistor_cords:
-        for n in nodes:
-            if n[0] == r[0] and n[1] == r[1]:
-                details.append((n, r))
-                break
+def assign_details(nodes, details, rgb_img):
+    for node in nodes:
+        if not isinstance(node, Resistor):
+            continue
+        index_closest = find_closest_detail(node.cords, details)
+        node.name=details[index_closest]
+        node.process_name()
+        details.pop(index_closest)
+
+    for node in nodes:
+        if not isinstance(node, Generator):
+            continue
+        # asuming that + sign is closer to the gen then name
+        index_closest = find_closest_detail(node.cords, details)
+        node.type = details[index_closest]
+        node.process_type()
+        details.pop(index_closest)
+
+        index_closest = find_closest_detail(node.cords, details)
+        node.name = details[index_closest]
+        node.process_name()
+        details.pop(index_closest)
+
+    for node in nodes:
+        if not isinstance(node, Junction):
+            continue
+        index_closest = find_closest_detail(node.cords, details)
+        node.name = details[index_closest]
+        node.process_name()
+        details.pop(index_closest)
+
+    for detail in details:
+        index_node = find_closest_node(detail.cords, nodes)
+        if isinstance(nodes[index_node], Junction):
+            nodes[index_node].potential = detail
+            nodes[index_node].process_potential()
+        else:
+            print("Not processed")
+    
+        
+    return nodes
+
