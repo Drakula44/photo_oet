@@ -34,12 +34,19 @@ def process_image(rgb_img):
     circuit_wo_gens = turn_off_gens(cleaned_circles, gen_cords)
 
     # get resistors
+    # ok ova funkcija ce biti kasnije smaranje kada bude trebalo i L, C i R, Z i sve komponente ali dobro ima vremna
     resistor_cords = get_resistors_cords(circuit_graph_img, circuit_wo_gens)
 
     # turn off components
+    # u ovoj funkciji ima funkcija find_connections koja ce najverovatnije da zabode na svakom sledecem primeru
+    # jer trenutno se nadam da samo savrseno uklonio sve piksele od komponente dok to u praksi bas i nije slucaj lol
+    # ali moze da se sredi sa malo razmisljanja 
+    # ustvari najverovatnije je resenje samo da se kada se uklanja generator izbrise sa rectom a ne sa krugom
     circuit_wo_components = turn_off_components(circuit_graph_img.copy(), resistor_cords, gen_cords)
 
     # find lines in image
+    # negde oko ovog dela treba izvuci gnd to me je mrzelo
+    # nisam siguran kako tacno ali trebalo bi da moze jer je to jedino ostlao vezano za kolo ako je sve ostalo izvuceno
     lines = find_lines(circuit_wo_components)
 
     # extract junctions
@@ -52,7 +59,6 @@ def process_image(rgb_img):
     details = find_bounding_box_details(clusterd_details)
 
     # structure elements properlly
-    print([i[-1] for i in gen_cords])
     gen_cords = [[np.array([i[0],i[1]]),"G"] for i in gen_cords]
     resistor_cords = [[np.array(i[0]),"R"] for i in resistor_cords]
     nodes = [np.array(i) for i in nodes]
